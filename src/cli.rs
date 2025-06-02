@@ -1,29 +1,21 @@
-use std::io::{stdin, stdout, Write};
+use crate::io::{get_input, is_quit, select_index};
 
 pub struct CLI {
     modules: Vec<Box<dyn SafeModule>>,
-    selected_module: Option<&Box<dyn SafeModule>>,
     state: CLIState,
 }
 
 enum CLIState {
     ModSelect,
-    InModule,
-    Quit
+    InModule(usize), // Stores the index of the selected module
+    Quit,
 }
 
+#[derive(Clone)]
 pub enum ModuleState {
     ToolSelect,
-    InTool,
-    Quit
-}
-
-fn get_input(message: &str) -> String {
-    print!("{}: ", message);
-    let mut buffer = String::new();
-    let _ = stdout().flush();
-    let _ = stdin().read_line(&mut buffer);
-    buffer.trim().to_string()
+    InTool(usize), // Stores the index of the selected tool
+    Quit,
 }
 
 impl CLI {
@@ -31,21 +23,23 @@ impl CLI {
         println!("Initializing CLI...");
         Self {
             modules,
-            selected_module: None,
-            state: CLIState::ModSelect
+            state: CLIState::ModSelect,
         }
     }
 
     pub fn run_loop(&mut self) {
         loop {
+            print!("{}[2J", 27 as char);
             match self.state {
                 CLIState::ModSelect => {
-                    self.list_modules();
-                },
-                CLIState::InModule => {
-                    self.selected_module.as_ref().unwrap().run_module();
+                    self.print_modules();
+                    self.select_module();
+                }
+                CLIState::InModule(module_index) => {
+                    let module = &mut self.modules[module_index];
+                    module.run_module();
                     self.state = CLIState::ModSelect;
-                },
+                }
                 CLIState::Quit => {
                     println!("Exiting CLI...");
                     break;
@@ -54,29 +48,27 @@ impl CLI {
         }
     }
 
-    pub fn list_modules(&mut self) {
+    pub fn print_modules(&self) {
         println!("Available Modules:");
         println!("Input Q to quit");
         for (index, module) in self.modules.iter().enumerate() {
             println!("{}. {}", index + 1, module.name());
             println!("  -{}", module.desc());
         }
+    }
+
+    pub fn select_module(&mut self) {
         let input = get_input("Select a module");
-        if input == "q" || input == "Q" {
+        if is_quit(&input) {
             self.state = CLIState::Quit;
             return;
         }
-        match input.parse::<usize>() {
-            Ok(index) => {
-                if index > 0 && index <= self.modules.len() {
-                    let selected_module = self.modules.get(index - 1);
-                    self.selected_module = selected_module;
-                    self.state = CLIState::InModule;
-                } else {
-                    println!("Invalid selection");
-                }
-            },
-            Err(_) => println!("Invalid input")
+
+        match select_index(&input, self.modules.len()) {
+            Some(index) => {
+                self.state = CLIState::InModule(index - 1);
+            }
+            None => println!("Invalid selection"),
         }
     }
 }
@@ -84,7 +76,7 @@ impl CLI {
 pub trait SafeModule {
     fn name(&self) -> &'static str;
     fn desc(&self) -> &'static str;
-    fn run_module(&self);
+    fn run_module(&mut self);
 }
 
 impl<T: ?Sized + Module> SafeModule for T {
@@ -94,8 +86,8 @@ impl<T: ?Sized + Module> SafeModule for T {
     fn desc(&self) -> &'static str {
         <T as Module>::MODULE_DESC
     }
-    fn run_module(&self) {
-        let _ = <T as Module>::run_module(&self);
+    fn run_module(&mut self) {
+        let _ = <T as Module>::run_loop(self);
     }
 }
 
@@ -105,10 +97,13 @@ pub trait Module: SafeModule {
     type Output;
     type Error;
 
-    fn init_module() -> Result<Self, Self::Error>
+    // TODO: Create derive macros
+    fn init_module(tools: Vec<Box<dyn SafeTool>>) -> Self
     where
         Self: Sized;
-    fn run_module(&self) -> Result<Self::Output, Self::Error>;
+    fn run_loop(&mut self);
+    fn print_tools(&self);
+    fn select_tool(&mut self);
 }
 
 pub trait SafeTool {

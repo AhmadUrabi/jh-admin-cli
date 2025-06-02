@@ -21,19 +21,24 @@
 ///     - Reliability Testing
 mod cli;
 mod modules;
+mod io;
+mod models;
 
 use dotenv::dotenv;
+use modules::email::ListEmailUsers;
 use modules::ldap::*;
 use cli::Module;
 use cli::*;
-use modules::user::UserModule;
 
 fn main() {
     // Read environment variables from .env file
     dotenv().ok();
-    // This will later be replaced with a function to initialize all modules
-    let ldap_module = LDAPModule::init_module().unwrap();
-    let users_module = UserModule::init_module().unwrap();
-    let mut cli = CLI::new(vec![Box::new(ldap_module), Box::new(users_module)]);
+    let tool = FetchUsersTool;
+    let email = ListEmailUsers;
+    // Initialize the LDAP module with all tools
+    let ldap_module = LDAPModule::init_module(vec![Box::new(tool), Box::new(email)]);
+
+    // Create a new CLI with our modules
+    let mut cli = CLI::new(vec![Box::new(ldap_module)]);
     cli.run_loop();
 }

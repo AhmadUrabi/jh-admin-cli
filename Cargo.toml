@@ -3,10 +3,18 @@ name = "jh_admin_cli"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "jh_admin_cli_macros"
+proc-macro = true
+
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }
 dotenv = "0.15.0"
 ldap3 = "0.11.5"
-reqwest = "0.12.18"
-serde = "1.0.219"
+quote = "1.0.40"
+reqwest = { version = "0.12.18", features = ["blocking", "json"] }
+serde = { version = "1.0.219", features = ["derive", "alloc"] }
 serde_json = "1.0.140"
+syn = "2.0.101"
+url = "2.4.1"
+webbrowser = "0.8.10"
